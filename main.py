@@ -26,6 +26,10 @@ commands = {
 }
 
 
+def truncate_text(text, limit=50):
+    return text[:limit] + "..." if len(text) > limit else text
+
+
 def chunks(lst: list, n: int) -> list:
     return list([lst[i:i + n] for i in range(0, len(lst), n)])
 
@@ -56,9 +60,16 @@ async def on_start(message: types.Message):
     await message.reply("Hello! I'm GPT4 client developed and maintained by @thed1mas")
 
 
-@dp.message_handler(commands=["reset", "delete", "regen"])
+@dp.message_handler(commands=["delete", "regen"])
 async def on_wip(message: types.Message):
     await message.reply("Work in progress!")
+
+
+@dp.message_handler(commands=["reset"])
+async def on_reset(message: types.Message):
+    if message.from_id in chats.keys():
+        chats[message.from_id] = []
+    await message.reply("Message history has been cleared")
 
 
 @dp.message_handler()
@@ -73,7 +84,7 @@ async def on_message(message: types.Message):
         chats[message.from_id] = []
 
     new = await message.answer("🧠 Starting generating...")
-    log.info(f"Starting generation with from [bold]{message.from_user.id}[/] with prompt [bold]{message.text}[/]")
+    log.info(f"Starting generation with from [bold]{message.from_user.id}[/] with prompt [bold]{truncate_text(message.text)}[/]")
     try:
         start = datetime.now()
         chats[message.from_id].append({"role": "user", "content": message.text})
@@ -88,16 +99,16 @@ async def on_message(message: types.Message):
         # tokens_completion = response["usage"]["completion_tokens"]
         tokens_completion = tokens_total - tokens_prompt
         log.success(
-            f"Generation of [bold]{message.get_args()}[/] finished. Used [bold]{tokens_total}[/] tokens. Spent [bold]{spent}s[/]")
+            f"Generation of [bold]{truncate_text(message.text)}[/] finished. Used [bold]{tokens_total}[/] tokens. Spent [bold]{spent}s[/]")
         if tokens_completion == 0:
             await new.edit_text("📭 Model retuned nothing (zero-length text)")
         else:
             result = response["choices"][0]["message"]["content"]
             if len(result) > 4000:
                 chunked = chunks(result, 4000)
-                await new.edit_text(chunked[0])
+                await new.edit_text(chunked[0], reply_markup="MarkdownV2")
                 for chunk in chunked:
-                    await new.answer(chunk)
+                    await new.answer(chunk, parse_mode="MarkdownV2")
             else:
                 await new.edit_text(response["choices"][0]["message"]["content"])
         await message.answer(
