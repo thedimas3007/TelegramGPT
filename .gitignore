@@ -1,0 +1,7 @@
+__pycache__/
+cache/
+.idea/
+.vscode/
+
+config.yml
+bot.db
