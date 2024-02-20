@@ -4,4 +4,4 @@ cache/
 .vscode/
 
 config.yml
-bot.db
+messages.db
