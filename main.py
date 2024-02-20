@@ -29,6 +29,16 @@ commands = {
     # "sql": "Raw SQL command"
 }
 
+# model -> [in, out]
+pricing = { 
+    "gpt-4-vision-preview": [0.01, 0.03],
+    "gpt-4-turbo-preview": [0.01, 0.03],
+    "gpt-4": [0.03, 0.06],
+    "gpt-4-32k": [0.06, 0.12],
+    "gpt-3.5-turbo-0125": [0.0005, 0.0015], # better use this instead of just gpt-3.5-turbo
+    "gpt-3.5-turbo-instruct": [0.0015, 0.0020]
+}
+model = "gpt-4-vision-preview"
 
 def truncate_text(text, limit=50):
     if text is None:
@@ -134,8 +144,7 @@ async def on_message(message: types.Message):
     try:
         start = datetime.now()
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4-vision-preview",
-            # model="gpt-3.5-turbo",
+            model=model,
             messages=chats[message.from_id],
             max_tokens=2048
         )
@@ -143,6 +152,7 @@ async def on_message(message: types.Message):
         tokens_total = response["usage"]["total_tokens"]
         tokens_prompt = response["usage"]["prompt_tokens"]
         tokens_completion = tokens_total - tokens_prompt
+        price = round((tokens_prompt * pricing[model][0] + tokens_completion * pricing[model][1]) / 1000, 2)
         log.success(
             f"Generation of [bold]{truncate_text(message.text)}[/] finished. Used [bold]{tokens_total}[/] tokens. Spent [bold]{spent}s[/]")
         if tokens_completion == 0:
@@ -152,12 +162,14 @@ async def on_message(message: types.Message):
             if len(result) > 3500:
                 chunked = chunks(result, 3500)
                 await new.edit_text(chunked[0], parse_mode="html")
-                for chunk in chunked:
+                for chunk in chunked[1:]:
                     await new.answer(chunk, parse_mode="html")
             else:
                 await new.edit_text(result, parse_mode="html")
         await message.answer(
-            f"📊 Used tokens *{tokens_total}* \(*{tokens_prompt}* prompt, *{tokens_completion}* completion\)\n⌛ Time spent *{escape(spent)}s*",
+            f"📊 Used tokens *{tokens_total}* \(*{tokens_prompt}* prompt, *{tokens_completion}* completion\)\n" + \
+            f"⌛ Time spent *{escape(spent)}s*\n" + \
+            f"💸 Approximate price: *{price}$*",
             parse_mode="MarkdownV2")
         chats[message.from_id].append(response["choices"][0]["message"])
     except Exception as e:
