@@ -110,27 +110,34 @@ async def callback_handler(query: types.CallbackQuery):
         page_id = -1
         try:
             page_id = int(data.split("_")[-1])
-        except:
+        except ValueError:
             await query.answer("Invalid query!")
             return
 
         all_chats = db.get_chats(query.from_user.id)
         if len(all_chats) == 0:
-            await query.message.answer("You have no chats")
+            await query.message.answer("You have no chats.")
             return
         
-        if page_id < 0 or page_id * 5 > len(chats):
+        if page_id < 0 or (page_id * 5) >= len(all_chats):
             await query.answer("Invalid page!")
-            return
-        cut = all_chats[page_id*5:min(len(chats), (page_id+1)*5)]
+            page_id = 0
+
+        start = page_id * 5
+        end = min(len(all_chats), (page_id + 1) * 5)
+        cut = all_chats[start:end]
+        
         buttons = []
-        for chat in cut[:min(5, len(chats) - page_id*5)]:
+        for chat in cut:
             buttons.append([types.InlineKeyboardButton(chat.title, callback_data=f"chatinfo_{chat.uid}")])
-        buttons.append([
-            types.InlineKeyboardButton("<<", callback_data=f"chatpage_{page_id-1}") if page_id > 0 else types.InlineKeyboardButton("•", callback_data="donothing"),
-            types.InlineKeyboardButton(f"{page_id+1}/{ceil(len(all_chats)/5)}", callback_data="donothing"),
-            types.InlineKeyboardButton(">>", callback_data=f"chatpage_{page_id+1}") if (page_id+1)*5 < len(all_chats) else types.InlineKeyboardButton("•", callback_data="donothing")
-        ])
+        
+        pagination_buttons = [
+            types.InlineKeyboardButton("<<", callback_data=f"chatpage_{page_id - 1}") if page_id > 0 else types.InlineKeyboardButton("•", callback_data="donothing"),
+            types.InlineKeyboardButton(f"{page_id + 1}/{ceil(len(all_chats) / 5)}", callback_data="donothing"),
+            types.InlineKeyboardButton(">>", callback_data=f"chatpage_{page_id + 1}") if end < len(all_chats) else types.InlineKeyboardButton("•", callback_data="donothing")
+        ]
+        buttons.append(pagination_buttons)
+        
         await query.message.edit_reply_markup(reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons))
 
     elif data.startswith("chatinfo"):
